@@ -41,6 +41,9 @@ pub fn execute(
     match msg {
         ExecuteMsg::Increment {} => try_increment(deps),
         ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::MakeBroker { address } => todo!(),
+        ExecuteMsg::MakeOffer { property } => todo!(),
+        ExecuteMsg::UpdateAdmin { address } => todo!(),
     }
 }
 
@@ -68,6 +71,7 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetOffer { id } => todo!(),
     }
 }
 
