@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use real_estate::msg::{PropertyResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use real_estate::msg::{ExecuteMsg, InstantiateMsg, PropertyResponse, QueryMsg};
 use real_estate::state::State;
 
 fn main() {
