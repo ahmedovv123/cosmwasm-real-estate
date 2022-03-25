@@ -1,80 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ExecuteMsg",
-  "anyOf": [
-    {
-      "type": "object",
-      "required": [
-        "increment"
-      ],
-      "properties": {
-        "increment": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "make_broker"
-      ],
-      "properties": {
-        "make_broker": {
-          "type": "object",
-          "required": [
-            "address"
-          ],
-          "properties": {
-            "address": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "make_offer"
-      ],
-      "properties": {
-        "make_offer": {
-          "type": "object",
-          "required": [
-            "property"
-          ],
-          "properties": {
-            "property": {
-              "$ref": "#/definitions/Property"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "update_admin"
-      ],
-      "properties": {
-        "update_admin": {
-          "type": "object",
-          "required": [
-            "address"
-          ],
-          "properties": {
-            "address": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    }
+  "title": "PropertyResponse",
+  "type": "object",
+  "required": [
+    "property"
   ],
+  "properties": {
+    "property": {
+      "$ref": "#/definitions/Property"
+    }
+  },
   "definitions": {
     "Property": {
       "type": "object",

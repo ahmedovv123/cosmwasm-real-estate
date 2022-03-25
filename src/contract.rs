@@ -1,11 +1,14 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+};
+use cw0::maybe_addr;
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::msg::{ExecuteMsg, InstantiateMsg, PropertyResponse, QueryMsg};
+use crate::state::{Property, State, ADMIN, BROKERS, PROPERTIES, STATE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:real-estate";
@@ -18,10 +21,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let state = State {
-        count: msg.count,
-        owner: info.sender.clone(),
-    };
+    let state = State { count: 0 };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     STATE.save(deps.storage, &state)?;
 
@@ -38,13 +38,64 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let api = deps.api;
     match msg {
         ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
-        ExecuteMsg::MakeBroker { address } => todo!(),
-        ExecuteMsg::MakeOffer { property } => todo!(),
-        ExecuteMsg::UpdateAdmin { address } => todo!(),
+        ExecuteMsg::MakeBroker { address } => try_make_broker(deps, info, address),
+        ExecuteMsg::MakeOffer { property } => try_make_offer(deps, info, property),
+        ExecuteMsg::UpdateAdmin { address } => {
+            Ok(ADMIN.execute_update_admin(deps, info, maybe_addr(api, Some(address))?)?)
+        }
     }
+}
+
+pub fn try_make_offer(
+    deps: DepsMut,
+    info: MessageInfo,
+    property: Property,
+) -> Result<Response, ContractError> {
+    // check if sender is broker
+    let brokers = BROKERS.load(deps.storage)?;
+
+    // load offers count
+    let offers_count = STATE.load(deps.storage)?.count;
+    if !brokers.contains(&info.sender) {
+        return Err(ContractError::NotBroker {});
+    } else {
+        PROPERTIES.save(deps.storage, offers_count + 1, &property)?;
+    }
+
+    let response = Response::new()
+        .add_attribute("action", "make_offer")
+        .add_attribute("offer_id", (offers_count + 1).to_string());
+
+    Ok(response)
+}
+
+pub fn try_make_broker(
+    deps: DepsMut,
+    info: MessageInfo,
+    address: String,
+) -> Result<Response, ContractError> {
+    // check if sender is admin
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+
+    // validate address
+    let validated_address = deps.api.addr_validate(&address)?;
+
+    // check if address is already a broker
+    BROKERS.update(deps.storage, |mut brokers| -> Result<_, ContractError> {
+        if brokers.contains(&validated_address) {
+            Err(ContractError::AlreadyBroker {})
+        } else {
+            brokers.push(validated_address.clone());
+            Ok(brokers)
+        }
+    })?;
+
+    Ok(Response::new()
+        .add_attribute("action", "make_broker")
+        .add_attribute("new_broker", validated_address))
 }
 
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
@@ -56,28 +107,23 @@ pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     Ok(Response::new().add_attribute("method", "try_increment"))
 }
 
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(Response::new().add_attribute("method", "reset"))
-}
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
-        QueryMsg::GetOffer { id } => todo!(),
+        QueryMsg::GetOffer { id } => to_binary(&query_property(deps, id)?),
     }
 }
 
-fn query_count(deps: Deps) -> StdResult<CountResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(CountResponse { count: state.count })
+pub fn query_property(deps: Deps, id: i32) -> StdResult<PropertyResponse> {
+    // load property by id
+
+    let property = PROPERTIES.may_load(deps.storage, id)?;
+    match property {
+        Some(prop) => Ok(PropertyResponse { property: prop }),
+        None => Err(StdError::NotFound {
+            kind: ContractError::PropertyNotFound {}.to_string(),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -98,55 +144,57 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetOffer { id: 1 });
         match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
+            Ok(_) => panic!("Should not found any offers"),
+            Err(_) => {}
         }
-
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
     }
+
+    // #[test]
+    // fn increment() {
+    //     let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+
+    //     let msg = InstantiateMsg { count: 17 };
+    //     let info = mock_info("creator", &coins(2, "token"));
+    //     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    //     // beneficiary can release it
+    //     let info = mock_info("anyone", &coins(2, "token"));
+    //     let msg = ExecuteMsg::Increment {};
+    //     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    //     // should increase counter by 1
+    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+    //     let value: CountResponse = from_binary(&res).unwrap();
+    //     assert_eq!(18, value.count);
+    // }
+
+    // #[test]
+    // fn reset() {
+    //     let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+
+    //     let msg = InstantiateMsg { count: 17 };
+    //     let info = mock_info("creator", &coins(2, "token"));
+    //     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    //     // beneficiary can release it
+    //     let unauth_info = mock_info("anyone", &coins(2, "token"));
+    //     let msg = ExecuteMsg::Reset { count: 5 };
+    //     let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+    //     match res {
+    //         Err(ContractError::Unauthorized {}) => {}
+    //         _ => panic!("Must return unauthorized error"),
+    //     }
+
+    //     // only the original creator can reset the counter
+    //     let auth_info = mock_info("creator", &coins(2, "token"));
+    //     let msg = ExecuteMsg::Reset { count: 5 };
+    //     let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+
+    //     // should now be 5
+    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+    //     let value: CountResponse = from_binary(&res).unwrap();
+    //     assert_eq!(5, value.count);
+    // }
 }

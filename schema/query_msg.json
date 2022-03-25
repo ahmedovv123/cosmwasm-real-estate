@@ -5,11 +5,20 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_offer"
       ],
       "properties": {
-        "get_count": {
-          "type": "object"
+        "get_offer": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         }
       },
       "additionalProperties": false
