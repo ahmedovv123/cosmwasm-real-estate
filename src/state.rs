@@ -12,12 +12,12 @@ pub struct State {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Property {
-    propery_type: PropertyType,
-    region: PropertyRegion,
-    squaring: String,
-    construction: String,
-    floor: String,
-    description: Option<String>,
+    pub propery_type: PropertyType,
+    pub region: PropertyRegion,
+    pub squaring: String,
+    pub construction: String,
+    pub floor: String,
+    pub description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

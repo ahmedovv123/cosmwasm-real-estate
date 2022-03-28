@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 use cw0::maybe_addr;
 use cw2::set_contract_version;
@@ -16,14 +16,17 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    deps: DepsMut,
+    mut deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State { count: 0 };
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATE.save(deps.storage, &state)?;
+    ADMIN.set(deps.branch(), Some(info.sender.clone()))?;
+    let storage = deps.storage;
+    set_contract_version(storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    STATE.save(storage, &state)?;
+    BROKERS.save(storage, &Vec::<Addr>::new())?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -128,6 +131,8 @@ pub fn query_property(deps: Deps, id: i32) -> StdResult<PropertyResponse> {
 
 #[cfg(test)]
 mod tests {
+    use crate::state::{PropertyRegion, PropertyType};
+
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
@@ -136,7 +141,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
+        let msg = InstantiateMsg { count: 0 };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -151,24 +156,88 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn increment() {
-    //     let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+    #[test]
+    fn only_admins_can_make_brokers() {
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let msg = InstantiateMsg { count: 0 };
+        let admin_info = mock_info("admin", &coins(1000, "earth"));
+        let non_admin_info = mock_info("non_admin", &coins(1000, "earth"));
 
-    //     let msg = InstantiateMsg { count: 17 };
-    //     let info = mock_info("creator", &coins(2, "token"));
-    //     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
 
-    //     // beneficiary can release it
-    //     let info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = ExecuteMsg::Increment {};
-    //     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let make_broker_msg = ExecuteMsg::MakeBroker {
+            address: "broker_candidate".to_string(),
+        };
+        let err_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            non_admin_info,
+            make_broker_msg.clone(),
+        );
 
-    //     // should increase counter by 1
-    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(18, value.count);
-    // }
+        match err_result {
+            Ok(_) => panic!("Should throw err 'Unauthorized'"),
+            Err(_) => {}
+        }
+
+        execute(deps.as_mut(), mock_env(), admin_info, make_broker_msg).unwrap();
+    }
+
+    #[test]
+    fn only_brokers_can_make_offers() {
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let msg = InstantiateMsg { count: 0 };
+        let admin_info = mock_info("admin", &coins(1000, "earth"));
+        instantiate(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+
+        let make_broker_msg = ExecuteMsg::MakeBroker {
+            address: "broker_candidate".to_string(),
+        };
+
+        execute(deps.as_mut(), mock_env(), admin_info, make_broker_msg).unwrap();
+
+        let broker_info = mock_info("broker_candidate", &coins(1000, "earth"));
+        let non_broker_info = mock_info("non_broker", &coins(1000, "earth"));
+
+        let property = Property {
+            propery_type: PropertyType::OneRoom {},
+            region: PropertyRegion::Varna {},
+            squaring: "90kv".to_string(),
+            construction: "Tuhla".to_string(),
+            floor: "5".to_string(),
+            description: None,
+        };
+
+        let make_offer_msg = ExecuteMsg::MakeOffer { property };
+
+        let err_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            non_broker_info,
+            make_offer_msg.clone(),
+        );
+
+        match err_result {
+            Ok(_) => panic!("Should throw 'NotBroker' error "),
+            Err(_) => {}
+        }
+
+        execute(deps.as_mut(), mock_env(), broker_info, make_offer_msg).unwrap();
+
+        // get brokers count and compare
+        let brokers = BROKERS.load(&deps.storage).unwrap();
+
+        assert_eq!(1, brokers.len());
+
+        // get property with id 1
+        let property = PROPERTIES.load(&deps.storage, 1).unwrap();
+        assert_eq!(PropertyType::OneRoom {}, property.propery_type);
+        assert_eq!(PropertyRegion::Varna {}, property.region);
+        assert_eq!("90kv".to_string(), property.squaring);
+        assert_eq!("Tuhla".to_string(), property.construction);
+        assert_eq!("5".to_string(), property.floor);
+        assert_eq!(None, property.description);
+    }
 
     // #[test]
     // fn reset() {
