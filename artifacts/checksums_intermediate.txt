@@ -1,0 +1,1 @@
+ee651ccb202ac7d2f9efe023c51bacb3117caf288395e255bbd03fc08286ebcc  ./target/wasm32-unknown-unknown/release/real_estate.wasm

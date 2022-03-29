@@ -12,7 +12,7 @@ pub struct State {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Property {
-    pub propery_type: PropertyType,
+    pub property_type: PropertyType,
     pub region: PropertyRegion,
     pub squaring: String,
     pub construction: String,
@@ -22,11 +22,11 @@ pub struct Property {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum PropertyType {
-    OneRoom {},
-    TwoRoom {},
-    ThreeRoom {},
-    FourRoom {},
-    MultiRoom {},
+    OneRoom,
+    TwoRoom,
+    ThreeRoom,
+    FourRoom,
+    MultiRoom,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

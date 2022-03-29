@@ -1,0 +1,1 @@
+7542d3741591fc23f00d9df1f0641a725bc6a2a7f8fe977d3b0b33aa4c440dd3  real_estate.wasm

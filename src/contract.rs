@@ -200,8 +200,8 @@ mod tests {
         let non_broker_info = mock_info("non_broker", &coins(1000, "earth"));
 
         let property = Property {
-            propery_type: PropertyType::OneRoom {},
-            region: PropertyRegion::Varna {},
+            property_type: PropertyType::OneRoom,
+            region: PropertyRegion::Varna,
             squaring: "90kv".to_string(),
             construction: "Tuhla".to_string(),
             floor: "5".to_string(),
@@ -231,8 +231,8 @@ mod tests {
 
         // get property with id 1
         let property = PROPERTIES.load(&deps.storage, 1).unwrap();
-        assert_eq!(PropertyType::OneRoom {}, property.propery_type);
-        assert_eq!(PropertyRegion::Varna {}, property.region);
+        assert_eq!(PropertyType::OneRoom, property.property_type);
+        assert_eq!(PropertyRegion::Varna, property.region);
         assert_eq!("90kv".to_string(), property.squaring);
         assert_eq!("Tuhla".to_string(), property.construction);
         assert_eq!("5".to_string(), property.floor);

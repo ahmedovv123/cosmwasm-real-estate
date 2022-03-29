@@ -81,7 +81,7 @@
       "required": [
         "construction",
         "floor",
-        "propery_type",
+        "property_type",
         "region",
         "squaring"
       ],
@@ -98,7 +98,7 @@
         "floor": {
           "type": "string"
         },
-        "propery_type": {
+        "property_type": {
           "$ref": "#/definitions/PropertyType"
         },
         "region": {
@@ -122,67 +122,13 @@
       ]
     },
     "PropertyType": {
-      "anyOf": [
-        {
-          "type": "object",
-          "required": [
-            "OneRoom"
-          ],
-          "properties": {
-            "OneRoom": {
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "TwoRoom"
-          ],
-          "properties": {
-            "TwoRoom": {
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "ThreeRoom"
-          ],
-          "properties": {
-            "ThreeRoom": {
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "FourRoom"
-          ],
-          "properties": {
-            "FourRoom": {
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "MultiRoom"
-          ],
-          "properties": {
-            "MultiRoom": {
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        }
+      "type": "string",
+      "enum": [
+        "OneRoom",
+        "TwoRoom",
+        "ThreeRoom",
+        "FourRoom",
+        "MultiRoom"
       ]
     }
   }
